@@ -1,0 +1,67 @@
+version: '3'
+services:
+  rabbitmq:
+      image: rabbitmq:3.8-management
+      container_name: rabbitmq
+      ports:
+          - 5672:5672
+          - 15672:15672
+      volumes:
+        - ./rabbitmq/definitions.json:/opt/definitions.json:ro
+        - ./rabbitmq/rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    ports:
+      - 8083:8083
+      - 8086:8086
+      - 8090:8090
+    env_file:
+      - './influxdb/env.influxdb'
+    volumes:
+      # Data persistency
+      # sudo mkdir -p /srv/docker/influxdb/data
+      - ./influxdb/data:/var/lib/influxdb
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    depends_on:
+      - influxdb
+    ports:
+      - 8092:8092
+      - 8125:8125
+      - 8094:8094
+    links:
+      - influxdb
+      - rabbitmq
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf/wait-for-dependencies.sh:/wait-for-dependencies.sh
+      - ./telegraf/test.sh:/tmp/test.sh
+    command: ["/wait-for-dependencies.sh", "/entrypoint.sh", "telegraf"]
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - 3000:3000
+    env_file:
+      - './grafana/env.grafana'
+    user: "0"
+    links:
+      - influxdb
+    volumes:
+      # Data persistency
+      # sudo mkdir -p /srv/docker/grafana/data; chown 472:472 /srv/docker/grafana/data
+      - ./grafana/data:/var/lib/grafana
+  chronograf:
+    image: chronograf:latest
+    container_name: chronograf
+    ports:
+      - 8888:8888
+    user: "0"
+    links:
+      - influxdb
+    volumes:
+      # Data persistency
+      # sudo mkdir -p /srv/docker/grafana/data; chown 472:472 /srv/docker/grafana/data
+      - ./chronograf/data:/var/lib/chronograf
